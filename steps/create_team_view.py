@@ -58,7 +58,7 @@ def create_team_total_dynamic_table(session, team_id):
     session.use_schema('HARMONIZED')
     team_name = get_team_name(session, team_id)
     _ = session.sql(f"CREATE OR REPLACE DYNAMIC TABLE {team_name} \
-                        TARGET_LAG = DOWNSTREAM \
+                        TARGET_LAG = '1 HOUR' \
                         WAREHOUSE = 'SI_WH' \
                         AS \
                         SELECT * FROM {team_name}_TOTAL_V").collect()
