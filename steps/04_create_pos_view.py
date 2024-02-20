@@ -1,107 +1,73 @@
-#------------------------------------------------------------------------------
-# Hands-On Lab: Data Engineering with Snowpark
-# Script:       04_create_order_view.py
-# Author:       Jeremiah Hansen, Caleb Baechtold
-# Last Updated: 1/9/2023
-#------------------------------------------------------------------------------
-
-# SNOWFLAKE ADVANTAGE: Snowpark DataFrame API
-# SNOWFLAKE ADVANTAGE: Streams for incremental processing (CDC)
-# SNOWFLAKE ADVANTAGE: Streams on views
-
-
 from snowflake.snowpark import Session
 #import snowflake.snowpark.types as T
 import snowflake.snowpark.functions as F
+from snowflake.snowpark.functions import when, col, sum, count
 
 
-def create_pos_view(session):
-    session.use_schema('HARMONIZED')
-    order_detail = session.table("RAW_POS.ORDER_DETAIL").select(F.col("ORDER_DETAIL_ID"), \
-                                                                F.col("LINE_NUMBER"), \
-                                                                F.col("MENU_ITEM_ID"), \
-                                                                F.col("QUANTITY"), \
-                                                                F.col("UNIT_PRICE"), \
-                                                                F.col("PRICE"), \
-                                                                F.col("ORDER_ID"))
-    order_header = session.table("RAW_POS.ORDER_HEADER").select(F.col("ORDER_ID"), \
-                                                                F.col("TRUCK_ID"), \
-                                                                F.col("ORDER_TS"), \
-                                                                F.to_date(F.col("ORDER_TS")).alias("ORDER_TS_DATE"), \
-                                                                F.col("ORDER_AMOUNT"), \
-                                                                F.col("ORDER_TAX_AMOUNT"), \
-                                                                F.col("ORDER_DISCOUNT_AMOUNT"), \
-                                                                F.col("LOCATION_ID"), \
-                                                                F.col("ORDER_TOTAL"))
-    truck = session.table("RAW_POS.TRUCK").select(F.col("TRUCK_ID"), \
-                                                F.col("PRIMARY_CITY"), \
-                                                F.col("REGION"), \
-                                                F.col("COUNTRY"), \
-                                                F.col("FRANCHISE_FLAG"), \
-                                                F.col("FRANCHISE_ID"))
-    menu = session.table("RAW_POS.MENU").select(F.col("MENU_ITEM_ID"), \
-                                                F.col("TRUCK_BRAND_NAME"), \
-                                                F.col("MENU_TYPE"), \
-                                                F.col("MENU_ITEM_NAME"))
-    franchise = session.table("RAW_POS.FRANCHISE").select(F.col("FRANCHISE_ID"), \
-                                                        F.col("FIRST_NAME").alias("FRANCHISEE_FIRST_NAME"), \
-                                                        F.col("LAST_NAME").alias("FRANCHISEE_LAST_NAME"))
-    location = session.table("RAW_POS.LOCATION").select(F.col("LOCATION_ID"))
-
+def get_team_name(session, team_id: int) -> str:
+    teams = session.table("RAW.TEAMS").select(F.col("TEAM_ID"), F.col("NAME"))
     
-    '''
-    We can do this one of two ways: either select before the join so it is more explicit, or just join on the full tables.
-    The end result is the same, it's mostly a readibility question.
-    '''
-    # order_detail = session.table("RAW_POS.ORDER_DETAIL")
-    # order_header = session.table("RAW_POS.ORDER_HEADER")
-    # truck = session.table("RAW_POS.TRUCK")
-    # menu = session.table("RAW_POS.MENU")
-    # franchise = session.table("RAW_POS.FRANCHISE")
-    # location = session.table("RAW_POS.LOCATION")
+    return teams.filter(F.col("TEAM_ID")== team_id).select("NAME").first()["NAME"].replace(" ", "_")
 
-    t_with_f = truck.join(franchise, truck['FRANCHISE_ID'] == franchise['FRANCHISE_ID'], rsuffix='_f')
-    oh_w_t_and_l = order_header.join(t_with_f, order_header['TRUCK_ID'] == t_with_f['TRUCK_ID'], rsuffix='_t') \
-                                .join(location, order_header['LOCATION_ID'] == location['LOCATION_ID'], rsuffix='_l')
-    final_df = order_detail.join(oh_w_t_and_l, order_detail['ORDER_ID'] == oh_w_t_and_l['ORDER_ID'], rsuffix='_oh') \
-                            .join(menu, order_detail['MENU_ITEM_ID'] == menu['MENU_ITEM_ID'], rsuffix='_m')
-    final_df = final_df.select(F.col("ORDER_ID"), \
-                            F.col("TRUCK_ID"), \
-                            F.col("ORDER_TS"), \
-                            F.col('ORDER_TS_DATE'), \
-                            F.col("ORDER_DETAIL_ID"), \
-                            F.col("LINE_NUMBER"), \
-                            F.col("TRUCK_BRAND_NAME"), \
-                            F.col("MENU_TYPE"), \
-                            F.col("PRIMARY_CITY"), \
-                            F.col("REGION"), \
-                            F.col("COUNTRY"), \
-                            F.col("FRANCHISE_FLAG"), \
-                            F.col("FRANCHISE_ID"), \
-                            F.col("FRANCHISEE_FIRST_NAME"), \
-                            F.col("FRANCHISEE_LAST_NAME"), \
-                            F.col("LOCATION_ID"), \
-                            F.col("MENU_ITEM_ID"), \
-                            F.col("MENU_ITEM_NAME"), \
-                            F.col("QUANTITY"), \
-                            F.col("UNIT_PRICE"), \
-                            F.col("PRICE"), \
-                            F.col("ORDER_AMOUNT"), \
-                            F.col("ORDER_TAX_AMOUNT"), \
-                            F.col("ORDER_DISCOUNT_AMOUNT"), \
-                            F.col("ORDER_TOTAL"))
-    final_df.create_or_replace_view('POS_FLATTENED_V')
+def get_all_team_ids(session) -> list:
+    
+    return [row.TEAM_ID for row in session.table("RAW.TEAMS").select("TEAM_ID").distinct().collect()]
+    
 
-def create_pos_view_stream(session):
+def create_team_totals_view(session, team_id: int):
     session.use_schema('HARMONIZED')
-    _ = session.sql('CREATE OR REPLACE STREAM POS_FLATTENED_V_STREAM \
-                        ON VIEW POS_FLATTENED_V \
-                        SHOW_INITIAL_ROWS = TRUE').collect()
+    fixtures = session.table("RAW.FIXTURES").select(F.col("FIXTURE_ID"), \
+                                                                F.col("LEAGUE_ID"), \
+                                                                F.col("HOME_TEAM_ID"), \
+                                                                F.col("AWAY_TEAM_ID"), \
+                                                                F.col("HOME_TEAM_GOALS"), \
+                                                                F.col("AWAY_TEAM_GOALS"), \
+                                                                F.col("FIXTURE_DATE"))
+    leagues = session.table("RAW.LEAGUES").select(F.col("LEAGUE_ID"), F.col("NAME"))
+    fixtures_filtered = fixtures.filter(((F.col("HOME_TEAM_ID"))== team_id) | (F.col("AWAY_TEAM_ID")== team_id))
+    goals_for = when(F.col("HOME_TEAM_ID")==team_id, col("HOME_TEAM_GOALS")).otherwise(col("AWAY_TEAM_GOALS"))
+    goals_against = when(col("AWAY_TEAM_ID") == team_id, col("HOME_TEAM_GOALS")).otherwise(col("AWAY_TEAM_GOALS"))
+    fixtures_for_against = fixtures_filtered.withColumn("GOALS_FOR", goals_for).withColumn("GOALS_AGAINST", goals_against)
+    points_df = fixtures_for_against.withColumn(
+                        "POINTS",
+                        when(col("GOALS_FOR") > col("GOALS_AGAINST"), 3)
+                        .when(col("GOALS_FOR") == col("GOALS_AGAINST"), 1)
+                        .otherwise(0)
+    )
+    totals_df = points_df.groupBy("LEAGUE_ID").agg(
+                        sum("GOALS_FOR").alias("GOALS_FOR"),
+                        sum("GOALS_AGAINST").alias("GOALS_AGAINST"),
+                        sum("POINTS").alias("POINTS"),
+                        count("FIXTURE_ID").alias("GAMES_PLAYED")
+                    )
+    totals_with_leagues = totals_df.join(leagues, totals_df["LEAGUE_ID"] == leagues["LEAGUE_ID"], rsuffix ='_leagues')
+    final_df = totals_with_leagues.select(
+        F.col("NAME").alias("LEAGUE_NAME"), \
+        F.col("GOALS_FOR"), \
+        F.col("GOALS_AGAINST"), \
+        F.col("POINTS"), \
+        F.col("GAMES_PLAYED")
+    )
 
-def test_pos_view(session):
+    team_name = get_team_name(session, team_id)
+
+    final_df.create_or_replace_view(f"{team_name}_TOTAL_V")
+   
+
+def create_team_total_dynamic_table(session, team_id):
     session.use_schema('HARMONIZED')
-    tv = session.table('POS_FLATTENED_V')
-    tv.limit(5).show()
+    team_name = get_team_name(session, team_id)
+    _ = session.sql(f"CREATE OR REPLACE DYNAMIC TABLE {team_name} \
+                        TARGET_LAG = '60 minutes' \
+                        WAREHOUSE = 'SI_WH' \
+                        AS \
+                        SELECT * FROM {team_name}_TOTAL_V").collect()
+
+# def test_pos_view(session, team_id):
+#     session.use_schema('HARMONIZED')
+#     team_name = get_team_name(session, team_id)
+#     tv = session.table(f'{team_name}_TOTAL_V')
+#     tv.limit(5).show()
 
 
 # For local debugging
@@ -115,8 +81,9 @@ if __name__ == "__main__":
     from utils import snowpark_utils
     session = snowpark_utils.get_snowpark_session()
 
-    create_pos_view(session)
-    create_pos_view_stream(session)
-#    test_pos_view(session)
+    for team_id in get_all_team_ids(session):
+        create_team_totals_view(session, team_id)
+        create_team_total_dynamic_table(session, team_id)
+        #test_team_total_view(session, team_id)
 
     session.close()

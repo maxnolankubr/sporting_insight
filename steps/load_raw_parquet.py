@@ -11,11 +11,9 @@ from snowflake.snowpark import Session
 #import snowflake.snowpark.functions as F
 
 
-POS_TABLES = ['country', 'franchise', 'location', 'menu', 'truck', 'order_header', 'order_detail']
-CUSTOMER_TABLES = ['customer_loyalty']
+TABLES = []
 TABLE_DICT = {
-    "pos": {"schema": "RAW_POS", "tables": POS_TABLES},
-    "customer": {"schema": "RAW_CUSTOMER", "tables": CUSTOMER_TABLES}
+    "table": {"schema": "RAW_POS", "tables": ''}
 }
 
 # SNOWFLAKE ADVANTAGE: Schema detection
@@ -44,24 +42,14 @@ def load_all_raw_tables(session):
         tnames = data['tables']
         schema = data['schema']
         for tname in tnames:
-            print("Loading {}".format(tname))
-            # Only load the first 3 years of data for the order tables at this point
-            # We will load the 2022 data later in the lab
-            if tname in ['order_header', 'order_detail']:
-                for year in ['2019', '2020', '2021']:
-                    load_raw_table(session, tname=tname, s3dir=s3dir, year=year, schema=schema)
-            else:
-                load_raw_table(session, tname=tname, s3dir=s3dir, schema=schema)
+            load_raw_table(session, tname=tname, s3dir=s3dir, schema=schema)
 
     _ = session.sql("ALTER WAREHOUSE HOL_WH SET WAREHOUSE_SIZE = XSMALL").collect()
 
 def validate_raw_tables(session):
     # check column names from the inferred schema
-    for tname in POS_TABLES:
-        print('{}: \n\t{}\n'.format(tname, session.table('RAW_POS.{}'.format(tname)).columns))
-
-    for tname in CUSTOMER_TABLES:
-        print('{}: \n\t{}\n'.format(tname, session.table('RAW_CUSTOMER.{}'.format(tname)).columns))
+    for tname in TABLES:
+        print('{}: \n\t{}\n'.format(tname, session.table('RAW.{}'.format(tname)).columns))
 
 
 # For local debugging
