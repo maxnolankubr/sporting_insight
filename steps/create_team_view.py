@@ -11,8 +11,7 @@ def get_team_name(session, team_id: int) -> str:
 
 def get_all_team_ids(session) -> list:
     
-    return [row.TEAM_ID for row in session.table("RAW.TEAMS").select("TEAM_ID").distinct().collect()]
-    
+    return [row.TEAM_ID for row in session.table("RAW.TEAMS").select("TEAM_ID").distinct().collect()]  
 
 def create_team_totals_view(session, team_id: int):
     session.use_schema('HARMONIZED')

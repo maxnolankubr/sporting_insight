@@ -5,13 +5,13 @@ snowsql_connection_name = "dev"
 input_parameters = "()"
 return_type = "string"
 file = "app.zip"
-name = "orders_update_sp"
+name = "league_fixtures_sp"
 handler = "app.main"
 execute_as_caller = true
 
 [dev]
-database = "HOL_DB"
+database = "SI_DB"
 schema = "HARMONIZED"
-warehouse = "HOL_WH"
-role = "HOL_ROLE"
+warehouse = "SI_WH"
+role = "SI_ROLE"
 overwrite = true
