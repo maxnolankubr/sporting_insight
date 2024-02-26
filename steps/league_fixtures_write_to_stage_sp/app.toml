@@ -2,10 +2,10 @@ snowsql_config_path = "~/.snowsql/config"
 snowsql_connection_name = "dev"
 
 [default]
-input_parameters = "()"
+input_parameters = "(league_name string)"
 return_type = "string"
 file = "app.zip"
-name = "write_to_stage_sp"
+name = "league_fixtures_write_to_stage_sp"
 handler = "app.main"
 execute_as_caller = true
 

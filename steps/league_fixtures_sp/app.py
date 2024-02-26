@@ -2,6 +2,14 @@ import time
 from snowflake.snowpark import Session
 #import snowflake.snowpark.types as T
 import snowflake.snowpark.functions as F
+import logging
+import os
+import sys
+
+log_folder_path = os.path.join('/tmp', 'league_fixtures_logs')
+os.makedirs(log_folder_path, exist_ok=True)  # Create 'logs' folder if it doesn't exist
+log_file_path = os.path.join(log_folder_path, 'league_fixtures_log.log')
+logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def table_exists(session, schema='', name=''):
@@ -24,7 +32,8 @@ def create_league_fixtures_stream(session, league_name):
     _ = session.sql(f"CREATE STREAM HARMONIZED.{league_name}_FIXTURES_STREAM ON TABLE HARMONIZED.{league_name}_FIXTURES").collect()
 
 def merge_order_updates(session, league_name):
-    print(f'processing {league_name} merge')
+    
+    logging.info(f'Processing {league_name} merge')
 
    # _ = session.sql('ALTER WAREHOUSE SI_WH SET WAREHOUSE_SIZE = XLARGE WAIT_FOR_COMPLETION = TRUE').collect()
 
@@ -32,33 +41,40 @@ def merge_order_updates(session, league_name):
     target = session.table(f'HARMONIZED.{league_name}_FIXTURES')
 
     cols_to_update = {c: source[c] for c in source.schema.names if "METADATA" not in c}
-    print(cols_to_update)
     metadata_col_to_update = {"META_UPDATED_AT": F.current_timestamp()}
     updates = {**cols_to_update, **metadata_col_to_update}
-    print(updates)
     # merge into DIM_CUSTOMER
     target.merge(source, target['FIXTURE_ID'] == source['FIXTURE_ID'], \
                         [F.when_matched().update(updates), F.when_not_matched().insert(updates)])
 
 #    _ = session.sql('ALTER WAREHOUSE SI_WH SET WAREHOUSE_SIZE = XSMALL').collect()
 
-    print(f'completed {league_name} merge')
+    logging.info(f'Completed {league_name} merge')
 
-def main(session: Session) -> str:
+def main(session: Session, league_name:str = 'all') -> str:
     # Create the ORDERS table and ORDERS_STREAM stream if they don't exist
     
-    for league_id in get_all_league_ids(session):
-        league_name = get_league_name(session, league_id)
+    if league_name == 'all':
+        logging.info('Processing all leagues')
+        for league_id in get_all_league_ids(session):
+            league_name = get_league_name(session, league_id)
+            if not table_exists(session, schema='HARMONIZED', name=f'{league_name}_FIXTURES'):
+                create_league_fixtures_table(session, league_name)
+                logging.info(f'{league_name} table created')
+                create_league_fixtures_stream(session, league_name)
+                logging.info(f'{league_name} stream created')
+            # Process data incrementally
+            merge_order_updates(session, league_name)
+        logging.info('Full run complete')
+    else:
+        logging.info(f'Processing {league_name}')
         if not table_exists(session, schema='HARMONIZED', name=f'{league_name}_FIXTURES'):
             create_league_fixtures_table(session, league_name)
-            print(f'{league_name} table created')
+            logging.info(f'{league_name} table created')
             create_league_fixtures_stream(session, league_name)
-            print(f'{league_name} stream created')
+            logging.info(f'{league_name} stream created')
         # Process data incrementally
         merge_order_updates(session, league_name)
-        #    session.table('HARMONIZED.ORDERS').limit(5).show()
-
-    return f"Successfully completed FIXTURES processing"
 
 
 # For local debugging
