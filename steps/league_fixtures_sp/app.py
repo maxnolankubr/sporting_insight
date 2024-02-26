@@ -10,7 +10,7 @@ def table_exists(session, schema='', name=''):
 
 def get_league_name(session, league_id: int) -> str:
     leagues = session.table("RAW.LEAGUES").select(F.col("LEAGUE_ID"), F.col("NAME"))
-    return leagues.filter(F.col("LEAGUE_ID") == league_id).select("NAME").first()["NAME"].replace(" ","_")
+    return leagues.filter(F.col("LEAGUE_ID") == league_id).select("NAME").first()["NAME"].replace(" ","_").upper()
 
 def get_all_league_ids(session) -> list:
 
@@ -24,20 +24,25 @@ def create_league_fixtures_stream(session, league_name):
     _ = session.sql(f"CREATE STREAM HARMONIZED.{league_name}_FIXTURES_STREAM ON TABLE HARMONIZED.{league_name}_FIXTURES").collect()
 
 def merge_order_updates(session, league_name):
-    _ = session.sql('ALTER WAREHOUSE SI_WH SET WAREHOUSE_SIZE = XLARGE WAIT_FOR_COMPLETION = TRUE').collect()
+    print(f'processing {league_name} merge')
 
-    source = session.table(f'HARMONIZED.{league_name}_FIXTURES_V_STREAM')
+   # _ = session.sql('ALTER WAREHOUSE SI_WH SET WAREHOUSE_SIZE = XLARGE WAIT_FOR_COMPLETION = TRUE').collect()
+
+    source = session.table(f'HARMONIZED.{league_name}_FIXTURES_V')
     target = session.table(f'HARMONIZED.{league_name}_FIXTURES')
 
     cols_to_update = {c: source[c] for c in source.schema.names if "METADATA" not in c}
+    print(cols_to_update)
     metadata_col_to_update = {"META_UPDATED_AT": F.current_timestamp()}
     updates = {**cols_to_update, **metadata_col_to_update}
-
+    print(updates)
     # merge into DIM_CUSTOMER
     target.merge(source, target['FIXTURE_ID'] == source['FIXTURE_ID'], \
                         [F.when_matched().update(updates), F.when_not_matched().insert(updates)])
 
-    _ = session.sql('ALTER WAREHOUSE SI_WH SET WAREHOUSE_SIZE = XSMALL').collect()
+#    _ = session.sql('ALTER WAREHOUSE SI_WH SET WAREHOUSE_SIZE = XSMALL').collect()
+
+    print(f'completed {league_name} merge')
 
 def main(session: Session) -> str:
     # Create the ORDERS table and ORDERS_STREAM stream if they don't exist
@@ -46,13 +51,14 @@ def main(session: Session) -> str:
         league_name = get_league_name(session, league_id)
         if not table_exists(session, schema='HARMONIZED', name=f'{league_name}_FIXTURES'):
             create_league_fixtures_table(session, league_name)
+            print(f'{league_name} table created')
             create_league_fixtures_stream(session, league_name)
-            continue
+            print(f'{league_name} stream created')
         # Process data incrementally
         merge_order_updates(session, league_name)
         #    session.table('HARMONIZED.ORDERS').limit(5).show()
 
-        return f"Successfully processed {league_name}_FIXTURES"
+    return f"Successfully completed FIXTURES processing"
 
 
 # For local debugging

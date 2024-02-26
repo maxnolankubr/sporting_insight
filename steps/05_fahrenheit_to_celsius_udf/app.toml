@@ -2,16 +2,16 @@ snowsql_config_path = "~/.snowsql/config"
 snowsql_connection_name = "dev"
 
 [default]
-input_parameters = "(temp_f float)"
-return_type = "float"
+input_parameters = "()"
+return_type = "string"
 file = "app.zip"
-name = "fahrenheit_to_celsius_udf"
+name = "write_to_stage_udf"
 handler = "app.main"
 execute_as_caller = true
 
 [dev]
-database = "HOL_DB"
+database = "SI_DB"
 schema = "ANALYTICS"
-warehouse = "HOL_WH"
-role = "HOL_ROLE"
+warehouse = "SI_WH"
+role = "SI_ROLE"
 overwrite = true

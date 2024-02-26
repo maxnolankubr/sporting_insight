@@ -5,13 +5,13 @@ snowsql_connection_name = "dev"
 input_parameters = "()"
 return_type = "string"
 file = "app.zip"
-name = "daily_city_metrics_update_sp"
+name = "write_to_stage_sp"
 handler = "app.main"
 execute_as_caller = true
 
 [dev]
-database = "HOL_DB"
-schema = "ANALYTICS"
-warehouse = "HOL_WH"
-role = "HOL_ROLE"
+database = "SI_DB"
+schema = "EXTERNAL"
+warehouse = "SI_WH"
+role = "SI_ROLE"
 overwrite = true

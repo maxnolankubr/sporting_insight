@@ -5,7 +5,7 @@ from snowflake.snowpark.functions import when, col, sum, count
 
 def get_league_name(session, league_id: int) -> str:
     leagues = session.table("RAW.LEAGUES").select(F.col("LEAGUE_ID"), F.col("NAME"))
-    return leagues.filter(F.col("LEAGUE_ID") == league_id).select("NAME").first()["NAME"].replace(" ","_")
+    return leagues.filter(F.col("LEAGUE_ID") == league_id).select("NAME").first()["NAME"].replace(" ","_").upper()
 
 def get_all_league_ids(session) -> list:
 

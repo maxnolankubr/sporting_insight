@@ -7,7 +7,7 @@ from snowflake.snowpark.functions import when, col, sum, count
 def get_team_name(session, team_id: int) -> str:
     teams = session.table("RAW.TEAMS").select(F.col("TEAM_ID"), F.col("NAME"))
     
-    return teams.filter(F.col("TEAM_ID")== team_id).select("NAME").first()["NAME"].replace(" ", "_")
+    return teams.filter(F.col("TEAM_ID")== team_id).select("NAME").first()["NAME"].replace(" ", "_").upper()
 
 def get_all_team_ids(session) -> list:
     
