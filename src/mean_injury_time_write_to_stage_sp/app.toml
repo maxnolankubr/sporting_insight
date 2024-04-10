@@ -1,0 +1,17 @@
+snowsql_config_path = "~/.snowsql/config"
+snowsql_connection_name = "dev"
+
+[default]
+input_parameters = "()"
+return_type = "string"
+file = "app.zip"
+name = "mean_injury_time_sp"
+handler = "app.main"
+execute_as_caller = true
+
+[dev]
+database = "DB_MODELLING"
+schema = "HARMONIZED"
+warehouse = "SI_WH"
+role = "SI_ROLE"
+overwrite = true
