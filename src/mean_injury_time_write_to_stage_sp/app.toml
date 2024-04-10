@@ -5,7 +5,7 @@ snowsql_connection_name = "dev"
 input_parameters = "()"
 return_type = "string"
 file = "app.zip"
-name = "mean_injury_time_sp"
+name = "mean_injury_time_write_to_stage_sp"
 handler = "app.main"
 execute_as_caller = true
 

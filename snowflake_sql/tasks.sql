@@ -15,9 +15,16 @@ WHEN
 AS
 CALL HARMONIZED.MEAN_INJURY_TIME_SP();
 
+CREATE OR REPLACE TASK MEAN_INJURY_TIME_EXPORT_TASK
+WAREHOUSE = SI_WH
+SCHEDULE = 'USING CRON 0 0 * * * GMT'
+AS
+CALL EXTERNAL.MEAN_INJURY_TIME_EXPORT_TASK();
+
 -- ----------------------------------------------------------------------------
 -- Step #2: Execute the tasks
 -- ----------------------------------------------------------------------------
 
 EXECUTE TASK MEAN_INJURY_TIME_TASK;
+EXECUTE TASK MEAN_INJURY_TIME_EXPORT_TASK
 
