@@ -2,16 +2,16 @@ snowsql_config_path = "~/.snowsql/config"
 snowsql_connection_name = "dev"
 
 [default]
-input_parameters = "(league_name string)"
+input_parameters = "()"
 return_type = "string"
 file = "app.zip"
-name = "league_fixtures_write_to_stage_sp"
+name = "mean_injury_time_sp"
 handler = "app.main"
 execute_as_caller = true
 
 [dev]
-database = "SI_DB"
-schema = "EXTERNAL"
+database = "DB_MODELLING"
+schema = "HARMONIZED"
 warehouse = "SI_WH"
 role = "SI_ROLE"
 overwrite = true

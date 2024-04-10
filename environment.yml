@@ -11,3 +11,4 @@ dependencies:
     # Snowflake
     - snowflake-cli-labs==0.2.9
     - pytest 7.1.3
+    - snowflake-snowpark-python[pandas]
