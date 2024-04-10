@@ -7,7 +7,6 @@ def table_exists(session, schema='', name=''):
     Checks if table already exists.
     '''
     exists = session.sql("SELECT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{}' AND TABLE_NAME = '{}') AS TABLE_EXISTS".format(schema, name)).collect()[0]['TABLE_EXISTS']
-    print('yes')
     return exists
 
 def create_mean_injury_time(session):
